@@ -5,14 +5,19 @@ on:
 
 concurrency: { group: "ci-${{ github.ref }}", cancel-in-progress: true }
 
+defaults:
+  run: { working-directory: backend }
+
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with: { package_json_file: backend/package.json }
+        with: { package_json_file: backend/package.json }
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: backend/pnpm-lock.yaml }
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
@@ -42,8 +47,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
+        with: { package_json_file: backend/package.json }
+        with: { package_json_file: backend/package.json }
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: pnpm }
+        with: { node-version: 22, cache: pnpm, cache-dependency-path: backend/pnpm-lock.yaml }
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:integration
 
@@ -57,8 +64,8 @@ jobs:
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
-          context: .
-          file: infrastructure/docker/Dockerfile
+          context: backend
+          file: backend/infrastructure/docker/Dockerfile
           build-args: APP=${{ matrix.app }}
           push: false
           cache-from: type=gha

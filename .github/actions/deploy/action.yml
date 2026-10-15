@@ -12,7 +12,7 @@ runs:
       run: |
         set -euo pipefail
         mkdir -p ~/.kube && echo "${{ inputs.kubeconfig }}" | base64 -d > ~/.kube/config
-        cd infrastructure/k8s/overlays/${{ inputs.overlay }}
+        cd backend/infrastructure/k8s/overlays/${{ inputs.overlay }}
         kustomize edit set image \
           registry.example.com/oms-api=${{ vars.REGISTRY }}/oms-api:${{ inputs.tag }} \
           registry.example.com/oms-worker=${{ vars.REGISTRY }}/oms-worker:${{ inputs.tag }} \

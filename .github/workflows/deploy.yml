@@ -24,8 +24,8 @@ jobs:
         with: { registry: "${{ vars.REGISTRY }}", username: "${{ secrets.REGISTRY_USER }}", password: "${{ secrets.REGISTRY_TOKEN }}" }
       - uses: docker/build-push-action@v6
         with:
-          context: .
-          file: infrastructure/docker/Dockerfile
+          context: backend
+          file: backend/infrastructure/docker/Dockerfile
           build-args: APP=${{ matrix.app }}
           target: ${{ matrix.app == 'migrate' && 'migrate' || 'runtime' }}
           push: true
