@@ -22,6 +22,7 @@
     "@oms/marketplace-core": "workspace:*",
     "@oms/mod-vendors": "workspace:*",
     "@oms/mod-categories": "workspace:*",
-    "@oms/mod-attributes": "workspace:*"
+    "@oms/mod-attributes": "workspace:*",
+    "@oms/mod-billing": "workspace:*"
   }
 }

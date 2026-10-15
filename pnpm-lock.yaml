@@ -401,21 +401,21 @@ importers:
 
   modules/ai:
     dependencies:
-      '@oms/mod-catalog':
+      '@oms/mod-analytics':
         specifier: workspace:*
-        version: link:../catalog
-      '@oms/mod-listings':
+        version: link:../analytics
+      '@oms/mod-inventory':
         specifier: workspace:*
-        version: link:../listings
-      '@oms/mod-orders':
-        specifier: workspace:*
-        version: link:../orders
+        version: link:../inventory
       '@oms/module-kit':
         specifier: workspace:*
         version: link:../../packages/module-kit
 
   modules/analytics:
     dependencies:
+      '@oms/mod-catalog':
+        specifier: workspace:*
+        version: link:../catalog
       '@oms/mod-inventory':
         specifier: workspace:*
         version: link:../inventory
@@ -482,9 +482,24 @@ importers:
 
   modules/automation:
     dependencies:
-      '@oms/mod-jobs':
+      '@oms/mod-ai':
         specifier: workspace:*
-        version: link:../jobs
+        version: link:../ai
+      '@oms/mod-fulfillment':
+        specifier: workspace:*
+        version: link:../fulfillment
+      '@oms/mod-inventory':
+        specifier: workspace:*
+        version: link:../inventory
+      '@oms/mod-notifications':
+        specifier: workspace:*
+        version: link:../notifications
+      '@oms/mod-rules':
+        specifier: workspace:*
+        version: link:../rules
+      '@oms/mod-sync':
+        specifier: workspace:*
+        version: link:../sync
       '@oms/module-kit':
         specifier: workspace:*
         version: link:../../packages/module-kit
@@ -515,6 +530,9 @@ importers:
       '@oms/mod-attributes':
         specifier: workspace:*
         version: link:../attributes
+      '@oms/mod-billing':
+        specifier: workspace:*
+        version: link:../billing
       '@oms/mod-categories':
         specifier: workspace:*
         version: link:../categories
@@ -704,6 +722,9 @@ importers:
       '@oms/marketplace-core':
         specifier: workspace:*
         version: link:../../packages/marketplace-core
+      '@oms/mod-billing':
+        specifier: workspace:*
+        version: link:../billing
       '@oms/mod-vendors':
         specifier: workspace:*
         version: link:../vendors
@@ -791,9 +812,9 @@ importers:
 
   modules/platform-admin:
     dependencies:
-      '@oms/mod-billing':
+      '@oms/mod-identity':
         specifier: workspace:*
-        version: link:../billing
+        version: link:../identity
       '@oms/mod-users':
         specifier: workspace:*
         version: link:../users

@@ -8,3 +8,4 @@ export { seedReferenceData } from './reference-data';
 export { createPlatformUser } from './platform-user';
 export { sql, eq, ne, and, or, not, desc, asc, inArray, isNull, isNotNull, gt, lt, gte, lte, ilike, like, count } from 'drizzle-orm';
 export type { SQL } from 'drizzle-orm';
+export { isFeatureEnabled, effectiveFlags } from './feature-flags';

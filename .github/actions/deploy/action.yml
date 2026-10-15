@@ -1,0 +1,33 @@
+name: deploy-overlay
+description: migrate -> roll out -> smoke test one environment (kustomize overlay)
+inputs:
+  overlay: { description: dev | staging | production, required: true }
+  tag: { description: image tag (git sha), required: true }
+  kubeconfig: { description: base64 kubeconfig, required: true }
+  base-url: { description: public API base URL for the smoke test, required: true }
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.kube && echo "${{ inputs.kubeconfig }}" | base64 -d > ~/.kube/config
+        cd infrastructure/k8s/overlays/${{ inputs.overlay }}
+        kustomize edit set image \
+          registry.example.com/oms-api=${{ vars.REGISTRY }}/oms-api:${{ inputs.tag }} \
+          registry.example.com/oms-worker=${{ vars.REGISTRY }}/oms-worker:${{ inputs.tag }} \
+          registry.example.com/oms-scheduler=${{ vars.REGISTRY }}/oms-scheduler:${{ inputs.tag }} \
+          registry.example.com/oms-webhook-worker=${{ vars.REGISTRY }}/oms-webhook-worker:${{ inputs.tag }} \
+          registry.example.com/oms-migrate=${{ vars.REGISTRY }}/oms-migrate:${{ inputs.tag }}
+        NS=$(kustomize build . | grep -m1 'namespace:' | awk '{print $2}')
+        # 1) migrate with the owner role; the app is NOT rolled if this fails
+        kubectl -n "$NS" delete job oms-migrate --ignore-not-found
+        kustomize build . | kubectl -n "$NS" apply -l app.kubernetes.io/component=migrate -f -
+        kubectl -n "$NS" wait --for=condition=complete job/oms-migrate --timeout=300s
+        kustomize build . | kubectl -n "$NS" apply -f -
+        # 2) roll (maxUnavailable 0) and wait
+        for d in oms-api oms-worker oms-webhook-worker oms-scheduler; do kubectl -n "$NS" rollout status deploy/$d --timeout=300s; done
+        # 3) smoke test: liveness, readiness and one authenticated-route policy check (401, never 5xx)
+        curl -fsS "${{ inputs.base-url }}/health/live"
+        curl -fsS "${{ inputs.base-url }}/health/ready"
+        test "$(curl -s -o /dev/null -w '%{http_code}' ${{ inputs.base-url }}/api/v1/me)" = "401"

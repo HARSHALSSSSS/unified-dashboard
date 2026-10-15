@@ -143,3 +143,34 @@ export async function registerDevice(tx: Tx, vendorId: string, userId: string, d
 export async function unregisterDevice(tx: Tx, vendorId: string, userId: string, token: string): Promise<void> {
   await tx.delete(DEV).where(and(eq(DEV.vendorId, vendorId), eq(DEV.userId, userId), eq(DEV.token, token)));
 }
+
+/**
+ * A notification that does not come from a domain event (an automation rule says "tell the team"). Same rules as event alerts:
+ * notification rules can mute / escalate it, de-duplicated while unread, channels by severity.
+ */
+export async function notifyVendor(c: Container, vendorId: string, input: { type?: string; severity?: Severity; title: string; body?: string | null; dedupeKey: string; entityType?: string | null; entityId?: string | null }): Promise<number> {
+  const type = input.type ?? 'automation.notice';
+  const pending: Pending[] = [];
+  let created = 0;
+  await withVendor(c.database.db, vendorId, async (tx) => {
+    let severity: Severity = input.severity ?? 'info';
+    const matched = await evaluateRules(tx, vendorId, 'notification', { eventType: type, severity, marketplace: null, title: input.title });
+    for (const m of matched) {
+      if (m.action.type === 'mute') return;
+      if (m.action.type === 'escalate') severity = (m.action.params as { severity: Severity }).severity;
+    }
+    const users = await tx.select({ id: schema.users.id }).from(schema.users).where(and(eq(schema.users.vendorId, vendorId), eq(schema.users.status, 'active'), isNull(schema.users.deletedAt)));
+    for (const u of users) {
+      const channels = DEFAULT_CHANNELS[severity];
+      const [n] = await tx.insert(N).values({ vendorId, userId: u.id, type, severity, title: input.title.slice(0, 200), body: input.body ?? null, entityType: input.entityType ?? null, entityId: input.entityId ?? null, data: { source: 'automation' }, dedupeKey: input.dedupeKey }).onConflictDoNothing().returning();
+      if (!n) continue;
+      created++;
+      for (const ch of channels) {
+        const [d] = await tx.insert(D).values({ vendorId, notificationId: n.id, channel: ch, status: ch === 'in_app' ? 'sent' : 'pending', sentAt: ch === 'in_app' ? new Date() : null }).returning();
+        if (ch !== 'in_app') pending.push({ notificationId: n.id, userId: u.id, channel: ch, deliveryId: d!.id });
+      }
+    }
+  });
+  if (pending.length) await deliverPending(c, vendorId, pending);
+  return created;
+}

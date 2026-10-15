@@ -60,7 +60,7 @@ const modules = [
   {
     name: 'catalog', title: 'Product Catalog',
     responsibility: 'Canonical product + variant/SKU master data. The single source of truth for what a vendor sells, independent of any marketplace.',
-    owns: ['products', 'product_variants', 'product_marketplace_data', 'data_jobs'], dependsOn: ['vendors', 'categories', 'attributes'], api: ['/api/v1/products', '/api/v1/variants', '/api/v1/data-jobs'],
+    owns: ['products', 'product_variants', 'product_marketplace_data', 'data_jobs'], dependsOn: ['vendors', 'categories', 'attributes', 'billing'], api: ['/api/v1/products', '/api/v1/variants', '/api/v1/data-jobs'],
     publishes: ['product.created', 'product.updated', 'product.archived', 'variant.created', 'variant.updated', 'variant.price_changed'], consumes: ['category.deleted', 'document.processed'],
     extraction: 'later',
   },
@@ -88,7 +88,7 @@ const modules = [
   {
     name: 'marketplace-accounts', title: 'Marketplace Accounts',
     responsibility: 'A vendor\'s connection to a marketplace (seller account), authorization lifecycle, encrypted credential custody. Credentials never leave the backend.',
-    owns: ['marketplace_accounts', 'marketplace_authorizations'], dependsOn: ['vendors'], api: ['/api/v1/marketplace-accounts'],
+    owns: ['marketplace_accounts', 'marketplace_authorizations'], dependsOn: ['vendors', 'billing'], api: ['/api/v1/marketplace-accounts'],
     publishes: ['marketplace_account.connected', 'marketplace_account.authorization_expired', 'marketplace_account.disconnected', 'marketplace_account.paused'], consumes: ['vendor.suspended'],
     extraction: 'later',
   },
@@ -191,30 +191,30 @@ const modules = [
   },
   {
     name: 'analytics', title: 'Analytics',
-    responsibility: 'Aggregated metrics/read models (sales, margin, stock-out) fed from domain events; dashboards.',
-    owns: ['analytics_* (future read models)'], dependsOn: ['orders', 'inventory', 'listings'], api: ['/api/v1/analytics'],
-    publishes: [], consumes: ['order.created', 'order.updated', 'inventory.adjusted', 'listing.published'],
+    responsibility: 'Reporting / aggregation layer: daily roll-ups (sales, products, returns, cancellations) maintained by a job, so dashboards never scan operational tables; profitability with actual / estimated / missing data kept apart; product, inventory and business health services.',
+    owns: ['analytics_daily_sales', 'analytics_daily_products', 'order_financials', 'fee_profiles'], dependsOn: ['orders', 'inventory', 'listings', 'catalog'], api: ['/api/v1/analytics'],
+    publishes: [], consumes: [],
     extraction: 'early',
   },
   {
     name: 'billing', title: 'Billing',
-    responsibility: 'Plans, subscriptions, usage metering, invoices, payment-provider integration.',
-    owns: ['plans (future)', 'subscriptions (future)', 'invoices (future)'], dependsOn: ['vendors'], api: ['/api/v1/billing'],
-    publishes: ['billing.subscription_changed', 'billing.payment_failed'], consumes: ['vendor.created', 'order.created'],
+    responsibility: 'SaaS billing, deliberately decoupled from the commerce engine: plans with feature limits, subscriptions, usage metering (from events), invoices, payment status. A payment provider plugs in behind the same payment records.',
+    owns: ['plans', 'subscriptions', 'usage_records', 'invoices', 'invoice_lines', 'payments'], dependsOn: ['vendors'], api: ['/api/v1/billing', '/api/v1/admin/billing'],
+    publishes: ['billing.subscription_changed', 'billing.payment_failed', 'billing.invoice_created'], consumes: ['vendor.created', 'order.created'],
     extraction: 'later',
   },
   {
     name: 'ai', title: 'AI',
-    responsibility: 'AI-assisted features (listing content generation, category prediction, anomaly detection) behind a provider-agnostic gateway with per-vendor quotas and audit.',
-    owns: ['ai_runs (future)'], dependsOn: ['catalog', 'listings', 'orders'], api: ['/api/v1/ai'],
-    publishes: ['ai.suggestion_created'], consumes: ['product.created'],
+    responsibility: 'AI layer ON TOP of real business data (never the source of truth): natural-language questions answered from analytics / inventory data, summaries, insights, anomaly detection and recommendations behind a provider boundary, with OBSERVE -> RECOMMEND -> APPROVE -> AUTOMATE safety.',
+    owns: ['ai_settings', 'ai_recommendations'], dependsOn: ['analytics', 'inventory'], api: ['/api/v1/ai'],
+    publishes: ['ai.recommendation_created', 'ai.recommendation_applied'], consumes: [],
     extraction: 'early',
   },
   {
     name: 'automation', title: 'Automation',
-    responsibility: 'Vendor-defined rules (trigger -> condition -> action), e.g. auto-pause listing on zero stock; consumes events, emits commands.',
-    owns: ['automation_rules (future)'], dependsOn: ['jobs'], api: ['/api/v1/automation'],
-    publishes: ['automation.rule_fired'], consumes: ['inventory.low_stock', 'order.created', 'listing.failed'],
+    responsibility: 'Vendor-defined rules (trigger event -> conditions -> whitelisted action) with execution history, human approval and rollback; every event is processed at most once per rule.',
+    owns: ['automation_rules', 'automation_executions'], dependsOn: ['ai', 'inventory', 'sync', 'fulfillment', 'notifications', 'rules'], api: ['/api/v1/automation'],
+    publishes: ['automation.rule_fired', 'automation.approval_requested'], consumes: ['order.created','order.needs_attention','order.cancellation_requested','inventory.low_stock','sync.failed','sync.dead_lettered','listing.failed','return.received','marketplace_account.disconnected','marketplace_account.authorization_expired','fulfillment.exception_raised','shipment.ndr_raised','shipment.rto_started'],
     extraction: 'later',
   },
   {
@@ -226,11 +226,12 @@ const modules = [
   },
   {
     name: 'platform-admin', title: 'Platform Admin',
-    responsibility: 'Cross-tenant operations for platform staff: vendor support, impersonation (audited), feature flags, system health, global connector config.',
-    owns: ['feature_flags (future)'], dependsOn: ['vendors', 'users', 'billing'], api: ['/api/v1/admin'],
-    publishes: ['admin.impersonation_started'], consumes: [],
+    responsibility: 'Cross-tenant operations for platform staff, separate from vendor access: vendors and users, global connector switches, feature flags, system health, failed jobs and integrations.',
+    owns: ['feature_flags', 'feature_flag_overrides'], dependsOn: ['vendors', 'users', 'identity'], api: ['/api/v1/admin', '/api/v1/features'],
+    publishes: ['admin.impersonation_started', 'admin.flag_changed'], consumes: [],
     extraction: 'keep',
   },
+
 ];
 
 const write = (path, content) => {

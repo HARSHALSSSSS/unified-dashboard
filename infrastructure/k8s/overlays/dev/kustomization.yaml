@@ -1,0 +1,18 @@
+# development cluster: one replica of everything, sandbox marketplaces, docs on. NOT for real customer data.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: oms-dev
+resources: [../../base]
+images:
+  - { name: registry.example.com/oms-api, newTag: dev }
+  - { name: registry.example.com/oms-worker, newTag: dev }
+  - { name: registry.example.com/oms-scheduler, newTag: dev }
+  - { name: registry.example.com/oms-webhook-worker, newTag: dev }
+  - { name: registry.example.com/oms-migrate, newTag: dev }
+patches:
+  - target: { kind: Deployment }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 1 }
+configMapGenerator:
+  - name: oms-config
+    literals: [SWAGGER_ENABLED=true, MOCK_MARKETPLACE_ENABLED=true, SANDBOX_COURIER_ENABLED=true, LOG_LEVEL=debug, APP_WEB_URL=https://app.dev.example.com, PUBLIC_BASE_URL=https://api.dev.example.com, PUBLIC_API_URL=https://api.dev.example.com]

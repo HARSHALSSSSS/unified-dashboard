@@ -1,6 +1,7 @@
 import { createRuntime, startOpsServer, startProcessors, startOutboxRelay } from '@oms/runtime';
 import { allModules } from '@oms/modules-registry';
 import { maintenanceHandlers } from './maintenance';
+import { startBusinessMetrics } from './business-metrics';
 
 /**
  * General background worker: domain-event fan-out, marketplace sync/push, notifications, heavy jobs,
@@ -16,5 +17,6 @@ const queues = requested.length ? ALL.filter((q) => requested.includes(q)) : [..
 startOpsServer(rt, rt.config.WORKER_HEALTH_PORT);
 startProcessors(rt, allModules, [...queues], maintenanceHandlers);
 if (queues.includes('domainEvents')) startOutboxRelay(rt);
+if (rt.config.METRICS_ENABLED) { const stop = startBusinessMetrics(rt); rt.onShutdown('business-metrics', async () => stop()); }
 
 rt.logger.info({ queues }, 'worker started');

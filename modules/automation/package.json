@@ -11,6 +11,11 @@
   },
   "dependencies": {
     "@oms/module-kit": "workspace:*",
-    "@oms/mod-jobs": "workspace:*"
+    "@oms/mod-ai": "workspace:*",
+    "@oms/mod-inventory": "workspace:*",
+    "@oms/mod-sync": "workspace:*",
+    "@oms/mod-fulfillment": "workspace:*",
+    "@oms/mod-notifications": "workspace:*",
+    "@oms/mod-rules": "workspace:*"
   }
 }

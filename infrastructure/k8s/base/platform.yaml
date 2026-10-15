@@ -1,0 +1,89 @@
+# Scheduler (idempotent, 1-2 replicas), webhook processor, edge (TLS + reverse proxy). Overlays set images / replicas / hosts.
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: oms-scheduler, labels: { app: oms-scheduler } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: oms-scheduler } }
+  template:
+    metadata: { labels: { app: oms-scheduler } }
+    spec:
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: scheduler
+          image: registry.example.com/oms-scheduler:REPLACED_BY_OVERLAY
+          ports: [{ containerPort: 3100, name: ops }]
+          envFrom: [{ secretRef: { name: oms-secrets } }, { configMapRef: { name: oms-config } }]
+          env: [{ name: NODE_ENV, value: production }]
+          resources: { requests: { cpu: 50m, memory: 128Mi }, limits: { memory: 256Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          livenessProbe: { httpGet: { path: /health/live, port: ops }, periodSeconds: 10 }
+          readinessProbe: { httpGet: { path: /health/ready, port: ops }, periodSeconds: 10 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: oms-webhook-worker, labels: { app: oms-webhook-worker } }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: oms-webhook-worker } }
+  template:
+    metadata:
+      labels: { app: oms-webhook-worker }
+      annotations: { prometheus.io/scrape: "true", prometheus.io/port: "3100", prometheus.io/path: /metrics }
+    spec:
+      terminationGracePeriodSeconds: 60
+      securityContext: { runAsNonRoot: true, runAsUser: 1000, seccompProfile: { type: RuntimeDefault } }
+      containers:
+        - name: webhook-worker
+          image: registry.example.com/oms-webhook-worker:REPLACED_BY_OVERLAY
+          ports: [{ containerPort: 3100, name: ops }]
+          envFrom: [{ secretRef: { name: oms-secrets } }, { configMapRef: { name: oms-config } }]
+          env: [{ name: NODE_ENV, value: production }]
+          resources: { requests: { cpu: 100m, memory: 192Mi }, limits: { memory: 384Mi } }
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          livenessProbe: { httpGet: { path: /health/live, port: ops }, periodSeconds: 10 }
+          readinessProbe: { httpGet: { path: /health/ready, port: ops }, periodSeconds: 10 }
+---
+# Migrations run as a Job with the OWNER role BEFORE the app rolls (expand / contract migrations only).
+apiVersion: batch/v1
+kind: Job
+metadata: { name: oms-migrate, labels: { app.kubernetes.io/component: migrate } }
+spec:
+  backoffLimit: 1
+  ttlSecondsAfterFinished: 86400
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: registry.example.com/oms-migrate:REPLACED_BY_OVERLAY
+          envFrom: [{ secretRef: { name: oms-migration-secrets } }, { configMapRef: { name: oms-config } }]
+---
+# Edge: TLS terminates at the ingress; it is THE trusted proxy (TRUST_PROXY=1). Rate limits at the edge are in addition to the app's.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: oms-api
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: 2m
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Forwarded-For: $remote_addr";
+spec:
+  ingressClassName: nginx
+  tls: [{ hosts: [api.example.com], secretName: oms-api-tls }]
+  rules:
+    - host: api.example.com
+      http: { paths: [{ path: /, pathType: Prefix, backend: { service: { name: oms-api, port: { name: http } } } }] }
+---
+# Only the ingress and monitoring may reach the API pods; workers have no inbound traffic except the metrics scraper.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: { name: oms-api-ingress }
+spec:
+  podSelector: { matchLabels: { app: oms-api } }
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{ namespaceSelector: { matchLabels: { name: ingress-nginx } } }, { namespaceSelector: { matchLabels: { name: monitoring } } }]
+      ports: [{ port: 3000 }]

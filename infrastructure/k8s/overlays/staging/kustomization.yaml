@@ -1,0 +1,14 @@
+# staging: production-shaped (same checks at boot), small, sandbox marketplaces + sandbox courier allowed for rehearsals.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: oms-staging
+resources: [../../base]
+images:
+  - { name: registry.example.com/oms-api, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-worker, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-scheduler, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-webhook-worker, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-migrate, newTag: GIT_SHA }
+configMapGenerator:
+  - name: oms-config
+    literals: [SWAGGER_ENABLED=true, MOCK_MARKETPLACE_ENABLED=false, SANDBOX_COURIER_ENABLED=true, LOG_LEVEL=info, APP_WEB_URL=https://app.staging.example.com, PUBLIC_BASE_URL=https://api.staging.example.com, PUBLIC_API_URL=https://api.staging.example.com]

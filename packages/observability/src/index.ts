@@ -117,3 +117,4 @@ export async function startTracing(cfg: TracingConfig): Promise<{ shutdown: () =
 }
 
 export { trace, context as otelContext, SpanStatusCode } from '@opentelemetry/api';
+export { Gauge } from 'prom-client';

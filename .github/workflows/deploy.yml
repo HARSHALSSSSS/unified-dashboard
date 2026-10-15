@@ -1,0 +1,52 @@
+name: deploy
+# CD: build + push immutable images (tag = git sha) on main, then promote  staging -> (manual approval) -> production.
+# Order inside every environment: 1) migrate Job (owner role)  2) roll workers + api  3) smoke test.  Rollback = redeploy the previous tag
+# (migrations are expand/contract, so the previous version still runs against the new schema).
+on:
+  push: { branches: [main] }
+  workflow_dispatch:
+    inputs:
+      environment: { description: "environment to (re)deploy", required: true, default: staging, type: choice, options: [dev, staging, production] }
+      tag: { description: "image tag (git sha) - leave empty for the current commit", required: false }
+
+concurrency: { group: "deploy-${{ github.ref }}", cancel-in-progress: false }
+permissions: { contents: read, packages: write, id-token: write }
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix: { app: [api, worker, scheduler, webhook-worker, migrate] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with: { registry: "${{ vars.REGISTRY }}", username: "${{ secrets.REGISTRY_USER }}", password: "${{ secrets.REGISTRY_TOKEN }}" }
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: infrastructure/docker/Dockerfile
+          build-args: APP=${{ matrix.app }}
+          target: ${{ matrix.app == 'migrate' && 'migrate' || 'runtime' }}
+          push: true
+          tags: ${{ vars.REGISTRY }}/oms-${{ matrix.app }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  staging:
+    needs: images
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy
+        with: { overlay: staging, tag: "${{ github.sha }}", kubeconfig: "${{ secrets.KUBECONFIG_STAGING }}", base-url: "${{ vars.STAGING_BASE_URL }}" }
+
+  production:
+    needs: staging
+    runs-on: ubuntu-latest
+    environment: production   # protected environment: requires a reviewer's approval
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy
+        with: { overlay: production, tag: "${{ github.sha }}", kubeconfig: "${{ secrets.KUBECONFIG_PRODUCTION }}", base-url: "${{ vars.PRODUCTION_BASE_URL }}" }

@@ -6,7 +6,7 @@ export const manifest = defineModule({
   title: "Marketplace Accounts",
   responsibility: "A vendor's connection to a marketplace (seller account), authorization lifecycle, encrypted credential custody. Credentials never leave the backend.",
   owns: ["marketplace_accounts", "marketplace_authorizations"],
-  dependsOn: ["vendors"],
+  dependsOn: ["vendors", "billing"],
   api: ["/api/v1/marketplace-accounts"],
   publishes: ["marketplace_account.connected", "marketplace_account.authorization_expired", "marketplace_account.disconnected", "marketplace_account.paused"],
   consumes: ["vendor.suspended"],

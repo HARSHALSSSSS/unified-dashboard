@@ -4,11 +4,11 @@ import { defineModule } from '@oms/module-kit';
 export const manifest = defineModule({
   name: "platform-admin",
   title: "Platform Admin",
-  responsibility: "Cross-tenant operations for platform staff: vendor support, impersonation (audited), feature flags, system health, global connector config.",
-  owns: ["feature_flags (future)"],
-  dependsOn: ["vendors", "users", "billing"],
-  api: ["/api/v1/admin"],
-  publishes: ["admin.impersonation_started"],
+  responsibility: "Cross-tenant operations for platform staff, separate from vendor access: vendors and users, global connector switches, feature flags, system health, failed jobs and integrations.",
+  owns: ["feature_flags", "feature_flag_overrides"],
+  dependsOn: ["vendors", "users", "identity"],
+  api: ["/api/v1/admin", "/api/v1/features"],
+  publishes: ["admin.impersonation_started", "admin.flag_changed"],
   consumes: [],
   extraction: "keep",
 });

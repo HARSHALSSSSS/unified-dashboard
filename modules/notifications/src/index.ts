@@ -6,7 +6,7 @@ import { notifyEvent } from './service';
 
 export { manifest };
 export { notificationRoutes } from './routes';
-export { notifyEvent, registerPushProvider, type PushProvider } from './service';
+export { notifyEvent, notifyVendor, registerPushProvider, type PushProvider } from './service';
 export { SPECS, TYPE_CATALOG, NOTIFICATION_TYPES, DEFAULT_CHANNELS } from './catalog';
 
 /** one consumer per source event: a failure of one alert type never blocks another */

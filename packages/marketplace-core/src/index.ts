@@ -347,3 +347,5 @@ export class ConnectorRegistry {
 }
 
 export type { InternalListingStatus, InternalOrderStatus };
+
+export { CircuitBreaker, TimeoutError, withTimeout } from './resilience';

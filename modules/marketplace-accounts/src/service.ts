@@ -1,7 +1,8 @@
-import { and, eq, escapeLike, ilike, keyset, or, schema, sql, type SQL, type Tx } from '@oms/database';
+import { and, eq, escapeLike, ilike, isFeatureEnabled, keyset, or, schema, sql, type SQL, type Tx } from '@oms/database';
 import { getSecretBox } from '@oms/auth';
 import { AppError, Errors } from '@oms/shared';
 import type { ConnectorCredentials } from '@oms/marketplace-core';
+import { enforceLimit } from '@oms/mod-billing';
 import type { Container } from '@oms/module-kit';
 
 export type AccountRow = typeof schema.marketplaceAccounts.$inferSelect;
@@ -67,6 +68,9 @@ export interface CreateAccountInput { marketplace: string; displayName: string; 
 
 export async function createAccount(tx: Tx, c: Container, vendorId: string, input: CreateAccountInput) {
   const connector = c.connectors.get(input.marketplace); // 404 for unknown / disabled marketplaces (e.g. mock in production)
+  // the platform can switch a connector off (globally or for one vendor) and plans can limit the number of connections
+  if (!(await isFeatureEnabled(tx, `connector.${connector.code}.enabled`, vendorId, true))) throw new AppError('FORBIDDEN', `${connector.displayName} connections are not available right now`, { details: { rule: 'feature_disabled', flag: `connector.${connector.code}.enabled` } });
+  await enforceLimit(tx, vendorId, 'marketplace_accounts');
   const mode = connector.code === 'mock' ? 'sandbox' : input.mode ?? 'live';
   if (connector.code === 'mock' && input.mode === 'live') throw Errors.validation({ issues: [{ path: 'mode', message: 'the mock marketplace is sandbox-only' }] });
   const [row] = await tx

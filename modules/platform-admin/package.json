@@ -13,6 +13,6 @@
     "@oms/module-kit": "workspace:*",
     "@oms/mod-vendors": "workspace:*",
     "@oms/mod-users": "workspace:*",
-    "@oms/mod-billing": "workspace:*"
+    "@oms/mod-identity": "workspace:*"
   }
 }

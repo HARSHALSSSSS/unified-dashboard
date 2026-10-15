@@ -4,11 +4,11 @@ import { defineModule } from '@oms/module-kit';
 export const manifest = defineModule({
   name: "automation",
   title: "Automation",
-  responsibility: "Vendor-defined rules (trigger -> condition -> action), e.g. auto-pause listing on zero stock; consumes events, emits commands.",
-  owns: ["automation_rules (future)"],
-  dependsOn: ["jobs"],
+  responsibility: "Vendor-defined rules (trigger event -> conditions -> whitelisted action) with execution history, human approval and rollback; every event is processed at most once per rule.",
+  owns: ["automation_rules", "automation_executions"],
+  dependsOn: ["ai", "inventory", "sync", "fulfillment", "notifications", "rules"],
   api: ["/api/v1/automation"],
-  publishes: ["automation.rule_fired"],
-  consumes: ["inventory.low_stock", "order.created", "listing.failed"],
+  publishes: ["automation.rule_fired", "automation.approval_requested"],
+  consumes: ["order.created", "order.needs_attention", "order.cancellation_requested", "inventory.low_stock", "sync.failed", "sync.dead_lettered", "listing.failed", "return.received", "marketplace_account.disconnected", "marketplace_account.authorization_expired", "fulfillment.exception_raised", "shipment.ndr_raised", "shipment.rto_started"],
   extraction: "later",
 });

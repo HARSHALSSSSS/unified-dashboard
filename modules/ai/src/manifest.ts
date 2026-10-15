@@ -4,11 +4,11 @@ import { defineModule } from '@oms/module-kit';
 export const manifest = defineModule({
   name: "ai",
   title: "AI",
-  responsibility: "AI-assisted features (listing content generation, category prediction, anomaly detection) behind a provider-agnostic gateway with per-vendor quotas and audit.",
-  owns: ["ai_runs (future)"],
-  dependsOn: ["catalog", "listings", "orders"],
+  responsibility: "AI layer ON TOP of real business data (never the source of truth): natural-language questions answered from analytics / inventory data, summaries, insights, anomaly detection and recommendations behind a provider boundary, with OBSERVE -> RECOMMEND -> APPROVE -> AUTOMATE safety.",
+  owns: ["ai_settings", "ai_recommendations"],
+  dependsOn: ["analytics", "inventory"],
   api: ["/api/v1/ai"],
-  publishes: ["ai.suggestion_created"],
-  consumes: ["product.created"],
+  publishes: ["ai.recommendation_created", "ai.recommendation_applied"],
+  consumes: [],
   extraction: "early",
 });

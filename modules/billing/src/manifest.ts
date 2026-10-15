@@ -4,11 +4,11 @@ import { defineModule } from '@oms/module-kit';
 export const manifest = defineModule({
   name: "billing",
   title: "Billing",
-  responsibility: "Plans, subscriptions, usage metering, invoices, payment-provider integration.",
-  owns: ["plans (future)", "subscriptions (future)", "invoices (future)"],
+  responsibility: "SaaS billing, deliberately decoupled from the commerce engine: plans with feature limits, subscriptions, usage metering (from events), invoices, payment status. A payment provider plugs in behind the same payment records.",
+  owns: ["plans", "subscriptions", "usage_records", "invoices", "invoice_lines", "payments"],
   dependsOn: ["vendors"],
-  api: ["/api/v1/billing"],
-  publishes: ["billing.subscription_changed", "billing.payment_failed"],
+  api: ["/api/v1/billing", "/api/v1/admin/billing"],
+  publishes: ["billing.subscription_changed", "billing.payment_failed", "billing.invoice_created"],
   consumes: ["vendor.created", "order.created"],
   extraction: "later",
 });

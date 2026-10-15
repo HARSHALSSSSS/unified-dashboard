@@ -14,11 +14,11 @@ Modules live in `modules/<name>` as workspace packages `@oms/mod-<name>`. A modu
 | **User Management** (`users`) | `users`, `invitations` | `identity`, `vendors` | keep |
 | **Categories** (`categories`) | `categories` | `vendors` | keep |
 | **Attributes** (`attributes`) | `attribute_definitions`, `attribute_values`, `category_attributes`, `product_attribute_values` | `categories` | keep |
-| **Product Catalog** (`catalog`) | `products`, `product_variants`, `product_marketplace_data`, `data_jobs` | `vendors`, `categories`, `attributes` | later |
+| **Product Catalog** (`catalog`) | `products`, `product_variants`, `product_marketplace_data`, `data_jobs` | `vendors`, `categories`, `attributes`, `billing` | later |
 | **Documents & Media** (`documents`) | `product_documents` | `catalog` | later |
 | **Warehouse** (`warehouses`) | `warehouses`, `warehouse_locations`, `warehouse_bins`, `warehouse_members` | `vendors` | keep |
 | **Inventory** (`inventory`) | `inventory`, `inventory_movements`, `inventory_reservations`, `stock_transfers`, `stock_transfer_items`, `vendor_counters`, `bin_stock`, `inbound_shipments`, `inbound_shipment_items` | `catalog`, `warehouses` | early |
-| **Marketplace Accounts** (`marketplace-accounts`) | `marketplace_accounts`, `marketplace_authorizations` | `vendors` | later |
+| **Marketplace Accounts** (`marketplace-accounts`) | `marketplace_accounts`, `marketplace_authorizations` | `vendors`, `billing` | later |
 | **Marketplace Connectors** (`marketplace-connectors`) | - | `marketplace-accounts` | early |
 | **Listings & Channels** (`listings`) | `marketplace_listings`, `category_mappings`, `attribute_mappings`, `imported_products`, `channel_inventory_policies`, `channel_stock_updates` | `catalog`, `marketplace-accounts`, `marketplace-connectors`, `inventory`, `sync`, `warehouses` | later |
 | **Pricing** (`pricing`) | `marketplace_prices`, `price_history` | `catalog`, `listings`, `rules` | later |
@@ -31,12 +31,12 @@ Modules live in `modules/<name>` as workspace packages `@oms/mod-<name>`. A modu
 | **Synchronization** (`sync`) | `sync_jobs`, `sync_logs` | `marketplace-accounts`, `marketplace-connectors`, `jobs` | early |
 | **Webhooks** (`webhooks`) | `webhook_events` | `marketplace-accounts`, `marketplace-connectors`, `jobs`, `sync`, `orders`, `listings` | early |
 | **Reports** (`reports`) | - | `orders`, `inventory`, `catalog` | later |
-| **Analytics** (`analytics`) | `analytics_* (future read models)` | `orders`, `inventory`, `listings` | early |
-| **Billing** (`billing`) | `plans (future)`, `subscriptions (future)`, `invoices (future)` | `vendors` | later |
-| **AI** (`ai`) | `ai_runs (future)` | `catalog`, `listings`, `orders` | early |
-| **Automation** (`automation`) | `automation_rules (future)` | `jobs` | later |
+| **Analytics** (`analytics`) | `analytics_daily_sales`, `analytics_daily_products`, `order_financials`, `fee_profiles` | `orders`, `inventory`, `listings`, `catalog` | early |
+| **Billing** (`billing`) | `plans`, `subscriptions`, `usage_records`, `invoices`, `invoice_lines`, `payments` | `vendors` | later |
+| **AI** (`ai`) | `ai_settings`, `ai_recommendations` | `analytics`, `inventory` | early |
+| **Automation** (`automation`) | `automation_rules`, `automation_executions` | `ai`, `inventory`, `sync`, `fulfillment`, `notifications`, `rules` | later |
 | **Audit** (`audit`) | `audit_logs` | - | early |
-| **Platform Admin** (`platform-admin`) | `feature_flags (future)` | `vendors`, `users`, `billing` | keep |
+| **Platform Admin** (`platform-admin`) | `feature_flags`, `feature_flag_overrides` | `vendors`, `users`, `identity` | keep |
 
 ## Details
 
@@ -112,7 +112,7 @@ Modules live in `modules/<name>` as workspace packages `@oms/mod-<name>`. A modu
 
 - **Owns data:** `products`, `product_variants`, `product_marketplace_data`, `data_jobs`
 - **API prefixes:** `/api/v1/products`, `/api/v1/variants`, `/api/v1/data-jobs`
-- **Depends on (sync calls):** `vendors`, `categories`, `attributes`
+- **Depends on (sync calls):** `vendors`, `categories`, `attributes`, `billing`
 - **Publishes events:** `product.created`, `product.updated`, `product.archived`, `variant.created`, `variant.updated`, `variant.price_changed`
 - **Consumes events:** `category.deleted`, `document.processed`
 - **Microservice extraction:** later
@@ -156,7 +156,7 @@ Modules live in `modules/<name>` as workspace packages `@oms/mod-<name>`. A modu
 
 - **Owns data:** `marketplace_accounts`, `marketplace_authorizations`
 - **API prefixes:** `/api/v1/marketplace-accounts`
-- **Depends on (sync calls):** `vendors`
+- **Depends on (sync calls):** `vendors`, `billing`
 - **Publishes events:** `marketplace_account.connected`, `marketplace_account.authorization_expired`, `marketplace_account.disconnected`, `marketplace_account.paused`
 - **Consumes events:** `vendor.suspended`
 - **Microservice extraction:** later
@@ -295,46 +295,46 @@ Modules live in `modules/<name>` as workspace packages `@oms/mod-<name>`. A modu
 
 ### Analytics — `analytics`
 
-**Responsibility:** Aggregated metrics/read models (sales, margin, stock-out) fed from domain events; dashboards.
+**Responsibility:** Reporting / aggregation layer: daily roll-ups (sales, products, returns, cancellations) maintained by a job, so dashboards never scan operational tables; profitability with actual / estimated / missing data kept apart; product, inventory and business health services.
 
-- **Owns data:** `analytics_* (future read models)`
+- **Owns data:** `analytics_daily_sales`, `analytics_daily_products`, `order_financials`, `fee_profiles`
 - **API prefixes:** `/api/v1/analytics`
-- **Depends on (sync calls):** `orders`, `inventory`, `listings`
+- **Depends on (sync calls):** `orders`, `inventory`, `listings`, `catalog`
 - **Publishes events:** none
-- **Consumes events:** `order.created`, `order.updated`, `inventory.adjusted`, `listing.published`
+- **Consumes events:** none
 - **Microservice extraction:** early
 
 ### Billing — `billing`
 
-**Responsibility:** Plans, subscriptions, usage metering, invoices, payment-provider integration.
+**Responsibility:** SaaS billing, deliberately decoupled from the commerce engine: plans with feature limits, subscriptions, usage metering (from events), invoices, payment status. A payment provider plugs in behind the same payment records.
 
-- **Owns data:** `plans (future)`, `subscriptions (future)`, `invoices (future)`
-- **API prefixes:** `/api/v1/billing`
+- **Owns data:** `plans`, `subscriptions`, `usage_records`, `invoices`, `invoice_lines`, `payments`
+- **API prefixes:** `/api/v1/billing`, `/api/v1/admin/billing`
 - **Depends on (sync calls):** `vendors`
-- **Publishes events:** `billing.subscription_changed`, `billing.payment_failed`
+- **Publishes events:** `billing.subscription_changed`, `billing.payment_failed`, `billing.invoice_created`
 - **Consumes events:** `vendor.created`, `order.created`
 - **Microservice extraction:** later
 
 ### AI — `ai`
 
-**Responsibility:** AI-assisted features (listing content generation, category prediction, anomaly detection) behind a provider-agnostic gateway with per-vendor quotas and audit.
+**Responsibility:** AI layer ON TOP of real business data (never the source of truth): natural-language questions answered from analytics / inventory data, summaries, insights, anomaly detection and recommendations behind a provider boundary, with OBSERVE -> RECOMMEND -> APPROVE -> AUTOMATE safety.
 
-- **Owns data:** `ai_runs (future)`
+- **Owns data:** `ai_settings`, `ai_recommendations`
 - **API prefixes:** `/api/v1/ai`
-- **Depends on (sync calls):** `catalog`, `listings`, `orders`
-- **Publishes events:** `ai.suggestion_created`
-- **Consumes events:** `product.created`
+- **Depends on (sync calls):** `analytics`, `inventory`
+- **Publishes events:** `ai.recommendation_created`, `ai.recommendation_applied`
+- **Consumes events:** none
 - **Microservice extraction:** early
 
 ### Automation — `automation`
 
-**Responsibility:** Vendor-defined rules (trigger -> condition -> action), e.g. auto-pause listing on zero stock; consumes events, emits commands.
+**Responsibility:** Vendor-defined rules (trigger event -> conditions -> whitelisted action) with execution history, human approval and rollback; every event is processed at most once per rule.
 
-- **Owns data:** `automation_rules (future)`
+- **Owns data:** `automation_rules`, `automation_executions`
 - **API prefixes:** `/api/v1/automation`
-- **Depends on (sync calls):** `jobs`
-- **Publishes events:** `automation.rule_fired`
-- **Consumes events:** `inventory.low_stock`, `order.created`, `listing.failed`
+- **Depends on (sync calls):** `ai`, `inventory`, `sync`, `fulfillment`, `notifications`, `rules`
+- **Publishes events:** `automation.rule_fired`, `automation.approval_requested`
+- **Consumes events:** `order.created`, `order.needs_attention`, `order.cancellation_requested`, `inventory.low_stock`, `sync.failed`, `sync.dead_lettered`, `listing.failed`, `return.received`, `marketplace_account.disconnected`, `marketplace_account.authorization_expired`, `fulfillment.exception_raised`, `shipment.ndr_raised`, `shipment.rto_started`
 - **Microservice extraction:** later
 
 ### Audit — `audit`
@@ -350,12 +350,12 @@ Modules live in `modules/<name>` as workspace packages `@oms/mod-<name>`. A modu
 
 ### Platform Admin — `platform-admin`
 
-**Responsibility:** Cross-tenant operations for platform staff: vendor support, impersonation (audited), feature flags, system health, global connector config.
+**Responsibility:** Cross-tenant operations for platform staff, separate from vendor access: vendors and users, global connector switches, feature flags, system health, failed jobs and integrations.
 
-- **Owns data:** `feature_flags (future)`
-- **API prefixes:** `/api/v1/admin`
-- **Depends on (sync calls):** `vendors`, `users`, `billing`
-- **Publishes events:** `admin.impersonation_started`
+- **Owns data:** `feature_flags`, `feature_flag_overrides`
+- **API prefixes:** `/api/v1/admin`, `/api/v1/features`
+- **Depends on (sync calls):** `vendors`, `users`, `identity`
+- **Publishes events:** `admin.impersonation_started`, `admin.flag_changed`
 - **Consumes events:** none
 - **Microservice extraction:** keep
 

@@ -1,0 +1,21 @@
+# production: Swagger off, no mock marketplace, no sandbox courier, Multi-AZ spread, bigger pools. The app REFUSES to boot with an unsafe config.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: oms-prod
+resources: [../../base]
+images:
+  - { name: registry.example.com/oms-api, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-worker, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-scheduler, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-webhook-worker, newTag: GIT_SHA }
+  - { name: registry.example.com/oms-migrate, newTag: GIT_SHA }
+patches:
+  - target: { kind: Deployment, name: oms-worker }
+    patch: |-
+      - { op: replace, path: /spec/replicas, value: 3 }
+  - target: { kind: Deployment, name: oms-api }
+    patch: |-
+      - { op: add, path: /spec/template/spec/topologySpreadConstraints, value: [{ maxSkew: 1, topologyKey: topology.kubernetes.io/zone, whenUnsatisfiable: ScheduleAnyway, labelSelector: { matchLabels: { app: oms-api } } }] }
+configMapGenerator:
+  - name: oms-config
+    literals: [SWAGGER_ENABLED=false, MOCK_MARKETPLACE_ENABLED=false, SANDBOX_COURIER_ENABLED=false, LOG_LEVEL=info, DATABASE_SSL=true, DATABASE_POOL_MAX=20, TRUST_PROXY=1, METRICS_ENABLED=true, APP_WEB_URL=https://app.example.com, PUBLIC_BASE_URL=https://api.example.com, PUBLIC_API_URL=https://api.example.com]

@@ -1,15 +1,21 @@
+import type { EventConsumer } from '@oms/module-kit';
 import { manifest } from './manifest';
+import { automationRoutes } from './routes';
+import { TRIGGERS, handleEvent } from './engine';
 
 export { manifest };
+export { automationRoutes } from './routes';
+export { TRIGGERS as AUTOMATION_TRIGGERS, ACTIONS as AUTOMATION_ACTIONS, factsOf, render } from './engine';
+
+/** one consumer per trigger event: a failing rule never blocks another trigger */
+const consumers: EventConsumer[] = Object.keys(TRIGGERS).map((event) => ({
+  event,
+  name: `automation.${event}`,
+  async handle(e, c) { await handleEvent(c, e); },
+}));
 
 /**
- * Public surface of the Automation module.
- * Other modules may import ONLY from this entry point (enforced by ESLint + scripts/check-modules.ts).
- *
- * Layering inside the module (dependencies point downward only):
- *   http/            Fastify routes + zod schemas (OpenAPI source). Calls application services.
- *   application/     Use-cases / services. Transaction + tenant-context aware. Emits events via outbox.
- *   domain/          Entities, value objects, policies, state machines. Pure, no I/O.
- *   infrastructure/  Repositories (tenant-scoped), external clients.
+ * Automation: trigger -> conditions -> whitelisted action, with execution history, approval and rollback. A rule runs at most once per
+ * event, is throttled, and (unless the vendor chose `auto`) waits for a person.
  */
-export const automationModule = { manifest };
+export const automationModule = { manifest, routes: automationRoutes, consumers };

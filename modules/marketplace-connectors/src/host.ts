@@ -2,7 +2,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { withVendor, writeAudit, writeOutboxEvent } from '@oms/database';
 import { AppError, newId } from '@oms/shared';
 import {
-  ConnectorError, withRetry, type ConnectorContext, type ConnectorCredentials, type CredentialSet, type MarketplaceConnector, type RetryOptions,
+  CircuitBreaker, ConnectorError, TimeoutError, withRetry, withTimeout, type ConnectorContext, type ConnectorCredentials, type CredentialSet, type MarketplaceConnector, type RetryOptions,
 } from '@oms/marketplace-core';
 import type { Container } from '@oms/module-kit';
 import {
@@ -69,9 +69,20 @@ const retryFrom = (c: Container, o: HostOptions): RetryOptions => ({
  *   - translates ConnectorError into API errors without leaking upstream internals
  * Database transactions are SHORT and never span a network call to a marketplace.
  */
+/**
+ * Process-wide (a ConnectorHost is created per job, so instance fields would give every job a fresh rate-limit bucket and a fresh
+ * circuit): all calls to one marketplace account in this process share one limiter and one breaker.
+ */
+const SHARED_LIMITER = new TokenBuckets();
+let sharedBreaker: CircuitBreaker | null = null;
+
 export class ConnectorHost {
-  private readonly limiter = new TokenBuckets();
-  constructor(private readonly c: Container, private readonly opts: HostOptions = {}) {}
+  private readonly limiter = SHARED_LIMITER;
+  private readonly breaker: CircuitBreaker;
+  constructor(private readonly c: Container, private readonly opts: HostOptions = {}) {
+    sharedBreaker ??= new CircuitBreaker(c.config.CONNECTOR_BREAKER_THRESHOLD, c.config.CONNECTOR_BREAKER_OPEN_MS);
+    this.breaker = sharedBreaker;
+  }
 
   private get now(): Date { return this.opts.now?.() ?? new Date(); }
   private db() { return this.c.database.db; }
@@ -114,12 +125,16 @@ export class ConnectorHost {
       credentials = next.credentials;
     }
 
+    // an account whose marketplace keeps failing is not called for a while (fail fast instead of piling up retries)
+    const wait = this.breaker.check(account.id);
+    if (wait !== null) throw new AppError('UPSTREAM_ERROR', 'The marketplace is temporarily unavailable; calls are paused briefly', { details: { kind: 'transient', code: 'circuit_open', retryAfterSeconds: Math.ceil(wait / 1000), marketplace: account.marketplace } });
+
     let refreshedOnAuthError = false;
     try {
       const result = await withRetry(async () => {
         await this.limiter.acquire(account.id, limits.requestsPerSecond, limits.burst);
         try {
-          return await fn(connector, this.context(account, credentials, opts.requestId));
+          return await withTimeout(() => fn(connector, this.context(account, credentials, opts.requestId)), this.c.config.CONNECTOR_TIMEOUT_MS);
         } catch (e) {
           // expired/invalid access token: refresh ONCE and retry the call
           if (e instanceof ConnectorError && e.kind === 'auth' && connector.refreshCredentials && !refreshedOnAuthError) {
@@ -131,9 +146,13 @@ export class ConnectorHost {
           throw e;
         }
       }, retryFrom(this.c, this.opts));
+      this.breaker.success(account.id);
       await withVendor(this.db(), vendorId, (tx) => recordSuccess(tx, vendorId, accountId));
       return result;
     } catch (e) {
+      // only outages count towards the breaker: bad credentials / bad input are not an outage
+      if (e instanceof TimeoutError || (e instanceof ConnectorError && (e.kind === 'transient' || e.kind === 'rate_limited'))) this.breaker.failure(account.id);
+      if (e instanceof TimeoutError) throw await this.handleFailure(vendorId, accountId, connector, new ConnectorError('transient', e.message, { code: 'timeout' }));
       throw await this.handleFailure(vendorId, accountId, connector, e);
     }
   }

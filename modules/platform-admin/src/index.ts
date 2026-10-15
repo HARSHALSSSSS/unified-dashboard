@@ -1,15 +1,12 @@
 import { manifest } from './manifest';
+import { platformAdminRoutes } from './routes';
 
 export { manifest };
+export { platformAdminRoutes } from './routes';
 
 /**
- * Public surface of the Platform Admin module.
- * Other modules may import ONLY from this entry point (enforced by ESLint + scripts/check-modules.ts).
- *
- * Layering inside the module (dependencies point downward only):
- *   http/            Fastify routes + zod schemas (OpenAPI source). Calls application services.
- *   application/     Use-cases / services. Transaction + tenant-context aware. Emits events via outbox.
- *   domain/          Entities, value objects, policies, state machines. Pure, no I/O.
- *   infrastructure/  Repositories (tenant-scoped), external clients.
+ * Platform Admin: cross-tenant operations for platform staff (vendors, users, connector switches, feature flags, system health,
+ * failed jobs / integrations). Separate permissions (`platform:*`) from every vendor role. Flag EVALUATION lives in @oms/database
+ * (`isFeatureEnabled`) so any module can use it without depending on this one.
  */
-export const platformAdminModule = { manifest };
+export const platformAdminModule = { manifest, routes: platformAdminRoutes };

@@ -4,7 +4,7 @@ import { syncJobHandlers } from './jobs';
 
 export { manifest };
 export {
-  createSyncJob, dispatchSyncJob, enqueueSyncJob, executeSyncJob, appendSyncLog, classifyFailure, backoffMs, getSyncJobRow, latestJobs, SYNC_QUEUE, syncJobName,
+  createSyncJob, resetForManualRetry, dispatchSyncJob, enqueueSyncJob, executeSyncJob, appendSyncLog, classifyFailure, backoffMs, getSyncJobRow, latestJobs, SYNC_QUEUE, syncJobName,
   type CreateJobInput, type SyncContext, type SyncJobRow, type SyncRunner, type SyncType, type SyncTrigger,
 } from './engine';
 export { SyncJobSchema, toSyncJobDto, listSyncJobs, syncRoutes } from './routes';

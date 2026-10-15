@@ -49,7 +49,7 @@ describe('schema conventions', () => {
 
   it('money columns are integer minor units, never floating point', () => {
     for (const t of cfg) for (const c of t.columns) {
-      if (/(price|amount|total|tax|discount|cost|mrp|shipping)/.test(c.name) && !c.name.endsWith('_bps') && !c.name.endsWith('_id') && !c.name.endsWith('_address')) {
+      if (/(price|amount|total|tax|discount|cost|mrp|shipping)/.test(c.name) && !c.name.endsWith('_bps') && !c.name.endsWith('_id') && !c.name.endsWith('_address') && !c.name.includes('_seconds_')) {
         expect(c.name, `${t.name}.${c.name}`).toMatch(/_minor$/);
         expect(c.getSQLType(), `${t.name}.${c.name}`).toBe('bigint');
       }

@@ -84,6 +84,11 @@ export const envSchema = z.object({
   CONNECTOR_RETRY_MAX_MS: z.coerce.number().int().min(0).default(5000),
   /** Upper bound on how long we honour a marketplace Retry-After inside one call (longer waits belong to the job retry). */
   CONNECTOR_RETRY_AFTER_CAP_MS: z.coerce.number().int().min(0).default(10_000),
+  /** No single marketplace call may run longer than this. */
+  CONNECTOR_TIMEOUT_MS: z.coerce.number().int().min(1000).max(120_000).default(30_000),
+  /** Consecutive infrastructure failures that open a marketplace account's circuit breaker, and how long it stays open. */
+  CONNECTOR_BREAKER_THRESHOLD: z.coerce.number().int().min(1).max(50).default(5),
+  CONNECTOR_BREAKER_OPEN_MS: z.coerce.number().int().min(1000).default(60_000),
   /** Sync jobs: attempts before dead-lettering, and the exponential backoff between attempts. */
   SYNC_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
   SYNC_BACKOFF_BASE_MS: z.coerce.number().int().min(0).default(30_000),
@@ -94,6 +99,12 @@ export const envSchema = z.object({
   WEBHOOK_RETENTION_DAYS: z.coerce.number().int().min(1).default(30),
   /** Public base URL marketplaces call back (shown in webhook configuration). */
   PUBLIC_API_URL: z.string().url().default('http://localhost:3000'),
+
+  // ---- AI (optional narrator; answers are always computed from real data)
+  AI_PROVIDER: z.enum(['rules', 'anthropic']).default('rules'),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  AI_MODEL: z.string().default('claude-sonnet-5-5'),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(1000).max(60000).default(15000),
 
   // ---- observability
   OTEL_ENABLED: bool.default(false),

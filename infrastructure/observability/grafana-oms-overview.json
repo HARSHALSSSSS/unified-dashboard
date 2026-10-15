@@ -1,0 +1,26 @@
+{
+  "title": "OMS — platform overview",
+  "uid": "oms-overview",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    { "type": "timeseries", "title": "API request rate by status", "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 }, "targets": [{ "expr": "sum by (status_code) (rate(http_request_duration_seconds_count{service=\"api\"}[5m]))" }] },
+    { "type": "timeseries", "title": "API latency p50 / p95 / p99", "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 }, "targets": [
+      { "expr": "histogram_quantile(0.50, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"api\"}[5m])))", "legendFormat": "p50" },
+      { "expr": "histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"api\"}[5m])))", "legendFormat": "p95" },
+      { "expr": "histogram_quantile(0.99, sum by (le) (rate(http_request_duration_seconds_bucket{service=\"api\"}[5m])))", "legendFormat": "p99" }] },
+    { "type": "stat", "title": "API error rate (5xx)", "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 }, "targets": [{ "expr": "sum(rate(http_request_duration_seconds_count{service=\"api\",status_code=~\"5..\"}[5m])) / sum(rate(http_request_duration_seconds_count{service=\"api\"}[5m]))" }] },
+    { "type": "stat", "title": "Outbox backlog (queue depth)", "gridPos": { "x": 6, "y": 8, "w": 6, "h": 4 }, "targets": [{ "expr": "max(oms_outbox_unpublished)" }] },
+    { "type": "stat", "title": "Oldest unpublished event (s)", "gridPos": { "x": 12, "y": 8, "w": 6, "h": 4 }, "targets": [{ "expr": "max(oms_outbox_oldest_seconds)" }] },
+    { "type": "stat", "title": "Database round trip (s)", "gridPos": { "x": 18, "y": 8, "w": 6, "h": 4 }, "targets": [{ "expr": "max(oms_db_ping_seconds)" }] },
+    { "type": "timeseries", "title": "Failed jobs by queue (rate)", "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 }, "targets": [{ "expr": "sum by (queue) (rate(jobs_processed_total{status=\"failed\"}[5m]))" }] },
+    { "type": "timeseries", "title": "Job duration p95 by queue", "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 }, "targets": [{ "expr": "histogram_quantile(0.95, sum by (le, queue) (rate(job_duration_seconds_bucket[5m])))" }] },
+    { "type": "timeseries", "title": "Sync jobs by status", "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 }, "targets": [{ "expr": "max by (status) (oms_sync_jobs)" }] },
+    { "type": "timeseries", "title": "Marketplace calls by outcome", "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 }, "targets": [{ "expr": "sum by (marketplace, outcome) (rate(marketplace_calls_total[5m]))" }] },
+    { "type": "timeseries", "title": "Marketplace connections: healthy vs unhealthy", "gridPos": { "x": 0, "y": 28, "w": 12, "h": 8 }, "targets": [{ "expr": "max by (marketplace, health) (oms_marketplace_accounts)" }] },
+    { "type": "timeseries", "title": "Webhook events by status", "gridPos": { "x": 12, "y": 28, "w": 12, "h": 8 }, "targets": [{ "expr": "max by (status) (oms_webhook_events)" }] },
+    { "type": "timeseries", "title": "DB pool connections", "gridPos": { "x": 0, "y": 36, "w": 12, "h": 8 }, "targets": [{ "expr": "max by (state) (db_pool_connections)" }] },
+    { "type": "stat", "title": "Automation approvals waiting", "gridPos": { "x": 12, "y": 36, "w": 12, "h": 8 }, "targets": [{ "expr": "max(oms_automation_pending_approvals)" }] }
+  ]
+}

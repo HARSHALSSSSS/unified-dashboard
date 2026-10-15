@@ -1,5 +1,6 @@
 import { and, eq, escapeLike, gte, ilike, inArray, isNull, keyset, lte, or, schema, sql, type SQL, type Tx } from '@oms/database';
 import { AppError, Errors } from '@oms/shared';
+import { enforceLimit } from '@oms/mod-billing';
 import { getCategory } from '@oms/mod-categories';
 import { getProductAttributeValues, setProductAttributeValues, type ProductValueInput } from '@oms/mod-attributes';
 import type { Effects } from './effects';
@@ -162,6 +163,7 @@ async function assertCanActivate(tx: Tx, vendorId: string, productId: string): P
 
 export async function createProduct(tx: Tx, vendorId: string, input: ProductInput, fx: Effects) {
   if (input.categoryId) await getCategory(tx, vendorId, input.categoryId);
+  await enforceLimit(tx, vendorId, 'products'); // reports always; rejects only when the platform enabled billing.enforce_limits for this vendor
   for (const v of input.variants ?? []) assertPrices(v);
   const skus = (input.variants ?? []).map((v) => v.sku);
   if (new Set(skus).size !== skus.length) throw Errors.validation({ issues: [{ path: 'variants', message: 'duplicate SKU in request' }] });

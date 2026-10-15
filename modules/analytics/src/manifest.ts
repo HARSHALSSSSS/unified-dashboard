@@ -4,11 +4,11 @@ import { defineModule } from '@oms/module-kit';
 export const manifest = defineModule({
   name: "analytics",
   title: "Analytics",
-  responsibility: "Aggregated metrics/read models (sales, margin, stock-out) fed from domain events; dashboards.",
-  owns: ["analytics_* (future read models)"],
-  dependsOn: ["orders", "inventory", "listings"],
+  responsibility: "Reporting / aggregation layer: daily roll-ups (sales, products, returns, cancellations) maintained by a job, so dashboards never scan operational tables; profitability with actual / estimated / missing data kept apart; product, inventory and business health services.",
+  owns: ["analytics_daily_sales", "analytics_daily_products", "order_financials", "fee_profiles"],
+  dependsOn: ["orders", "inventory", "listings", "catalog"],
   api: ["/api/v1/analytics"],
   publishes: [],
-  consumes: ["order.created", "order.updated", "inventory.adjusted", "listing.published"],
+  consumes: [],
   extraction: "early",
 });

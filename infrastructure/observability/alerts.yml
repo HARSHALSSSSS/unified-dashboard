@@ -21,3 +21,50 @@ groups:
         for: 15m
         labels: { severity: ticket }
         annotations: { summary: "Marketplace {{ $labels.marketplace }} calls failing >25% (outage or credential expiry)" }
+  - name: oms-business
+    rules:
+      - alert: OutboxNotDraining
+        expr: oms_outbox_oldest_seconds > 300
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Domain events are not being published (oldest {{ $value }}s): workers down or Redis unavailable" }
+      - alert: OutboxBacklogGrowing
+        expr: oms_outbox_unpublished > 5000
+        for: 10m
+        labels: { severity: ticket }
+        annotations: { summary: "More than 5000 domain events waiting" }
+      - alert: SyncJobsDeadLettered
+        expr: oms_sync_jobs{status="dead_lettered"} > 0
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "Marketplace sync jobs gave up and need a person" }
+      - alert: SyncJobsStuck
+        expr: oms_sync_jobs_stuck > 0
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "Sync jobs running for over 30 minutes (stuck worker?)" }
+      - alert: WebhooksFailing
+        expr: sum(oms_webhook_events{status=~"failed|dead_lettered"}) > 20
+        for: 10m
+        labels: { severity: ticket }
+        annotations: { summary: "Inbound marketplace webhooks are failing" }
+      - alert: MarketplaceAccountsUnhealthy
+        expr: sum by (marketplace) (oms_marketplace_accounts{health="unhealthy"}) / sum by (marketplace) (oms_marketplace_accounts) > 0.2
+        for: 15m
+        labels: { severity: ticket }
+        annotations: { summary: "Over 20% of {{ $labels.marketplace }} connections are unhealthy (expired credentials or an outage)" }
+      - alert: DatabaseSlow
+        expr: oms_db_ping_seconds > 0.5
+        for: 5m
+        labels: { severity: page }
+        annotations: { summary: "Database round trip above 500 ms" }
+      - alert: WorkerDown
+        expr: absent(up{job="oms-worker"} == 1)
+        for: 3m
+        labels: { severity: page }
+        annotations: { summary: "No worker is up: nothing is syncing, shipping or notifying" }
+      - alert: AutomationApprovalsWaiting
+        expr: oms_automation_pending_approvals > 50
+        for: 1h
+        labels: { severity: info }
+        annotations: { summary: "Many automation executions are waiting for approval" }

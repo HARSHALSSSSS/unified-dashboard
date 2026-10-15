@@ -19,6 +19,7 @@
     "fastify-type-provider-zod": "^7.0.0",
     "@oms/auth": "workspace:*",
     "@oms/marketplace-core": "workspace:*",
-    "@oms/mod-vendors": "workspace:*"
+    "@oms/mod-vendors": "workspace:*",
+    "@oms/mod-billing": "workspace:*"
   }
 }
